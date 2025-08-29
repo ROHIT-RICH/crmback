@@ -1,21 +1,21 @@
 const Attendance = require("../models/Attendance");
 const Employee = require("../models/Employee");
-const moment = require("moment-timezone");
-
-const TIMEZONE = "Asia/Kolkata"; // set default timezone
+const moment = require("moment");
 
 // POST /api/attendance/mark-in
 exports.markIn = async (req, res) => {
   const employeeId = req.user.id;
-  const date = moment().tz(TIMEZONE).format("YYYY-MM-DD");   // ✅ local date
-  const loginTime = moment().tz(TIMEZONE).format("HH:mm:ss"); // ✅ local time
+  const date = moment().format("YYYY-MM-DD");
+  const loginTime = moment().format("HH:mm:ss");
 
   try {
+    // Check if already marked in
     const existing = await Attendance.findOne({ employee: employeeId, date });
     if (existing) {
       return res.status(200).json({ msg: "Already marked in." });
     }
 
+    // Get employee details
     const employee = await Employee.findById(employeeId);
     if (!employee) {
       return res.status(404).json({ msg: "Employee not found" });
@@ -37,16 +37,12 @@ exports.markIn = async (req, res) => {
   }
 };
 
-
 // POST /api/attendance/mark-out
 
 exports.markOut = async (req, res) => {
-  const TIMEZONE = "Asia/Kolkata";
   const employeeId = req.user.id;
-
-  // Use IST for date + time
-  const date = moment().tz(TIMEZONE).format("YYYY-MM-DD");
-  const logoutTime = moment().tz(TIMEZONE);
+  const date = moment().format("YYYY-MM-DD");
+  const logoutTime = moment(); // store as moment object
 
   try {
     const attendance = await Attendance.findOne({ employee: employeeId, date });
@@ -59,15 +55,14 @@ exports.markOut = async (req, res) => {
       return res.status(200).json({ msg: "Already marked out" });
     }
 
-    // 🔹 Parse stored login time with IST
-    const loginTime = moment
-      .tz(`${date} ${attendance.loginTime}`, "YYYY-MM-DD HH:mm:ss", TIMEZONE);
+    // Parse existing login time
+    const loginTime = moment(attendance.loginTime, "HH:mm:ss");
 
-    // 🔹 Duration in IST
+    // Calculate total hours worked
     const duration = moment.duration(logoutTime.diff(loginTime));
     const hoursWorked = duration.asHours();
 
-    // Status logic
+    // Determine status
     let status = "Absent";
     if (hoursWorked >= 7.5) {
       status = "Present";
@@ -75,7 +70,7 @@ exports.markOut = async (req, res) => {
       status = "Half Day";
     }
 
-    // Save back in IST
+    // Save logout time, hours, and status
     attendance.logoutTime = logoutTime.format("HH:mm:ss");
     attendance.hoursWorked = hoursWorked.toFixed(2);
     attendance.status = status;
@@ -88,12 +83,12 @@ exports.markOut = async (req, res) => {
       status,
       hoursWorked: hoursWorked.toFixed(2),
     });
+
   } catch (err) {
     console.error("Error marking out:", err);
     res.status(500).json({ error: err.message });
   }
 };
-
 
 
 // GET /api/attendance/all (Admin only)

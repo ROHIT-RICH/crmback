@@ -41,10 +41,7 @@ exports.markIn = async (req, res) => {
 // POST /api/attendance/mark-out
 
 exports.markOut = async (req, res) => {
-  const TIMEZONE = "Asia/Kolkata";
   const employeeId = req.user.id;
-
-  // Use IST for date + time
   const date = moment().tz(TIMEZONE).format("YYYY-MM-DD");
   const logoutTime = moment().tz(TIMEZONE);
 
@@ -59,15 +56,11 @@ exports.markOut = async (req, res) => {
       return res.status(200).json({ msg: "Already marked out" });
     }
 
-    // 🔹 Parse stored login time with IST
-    const loginTime = moment
-      .tz(`${date} ${attendance.loginTime}`, "YYYY-MM-DD HH:mm:ss", TIMEZONE);
+    const loginTime = moment(attendance.loginTime, "HH:mm:ss").tz(TIMEZONE);
 
-    // 🔹 Duration in IST
     const duration = moment.duration(logoutTime.diff(loginTime));
     const hoursWorked = duration.asHours();
 
-    // Status logic
     let status = "Absent";
     if (hoursWorked >= 7.5) {
       status = "Present";
@@ -75,7 +68,6 @@ exports.markOut = async (req, res) => {
       status = "Half Day";
     }
 
-    // Save back in IST
     attendance.logoutTime = logoutTime.format("HH:mm:ss");
     attendance.hoursWorked = hoursWorked.toFixed(2);
     attendance.status = status;
@@ -93,7 +85,6 @@ exports.markOut = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
 
 
 // GET /api/attendance/all (Admin only)
